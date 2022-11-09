@@ -1,4 +1,4 @@
-# Ansible playbooks to install and uninstall MongoDB
+# Ansible playbooks to install and uninstall MongoDB in private lab environments.
 
 ## 1) Install Ansible: 
 ~~~
