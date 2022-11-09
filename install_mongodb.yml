@@ -1,0 +1,54 @@
+---
+- name: Install MongoDB on localhost.
+  hosts: localhost
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Create repo file for mongodb-enterprise-6.0
+      template:
+        src: mongodb-enterprise.repo.j2
+        dest: /etc/yum.repos.d/mongodb-enterprise-6.0.repo
+
+    - name: Install mongodb-enterprise.
+      package:
+        name: mongodb-enterprise
+        state: present
+
+    - name: Start mongod service.
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+
+    - name: Check mongod status.
+      shell: "systemctl status mongod"
+      register: mongod_check
+      failed_when: not 'active (running)' in mongod_check.stdout
+    
+    - name: Print mongod status.
+      debug:
+        msg: "{{ mongod_check.stdout }}"
+
+    - name: Check mongod version.
+      shell: mongod --version
+      register: mongod_version
+
+    - name: Print mongod version.
+      debug:
+        msg: mongod_version.stdout
+
+    - name: Set bindIP to 0.0.0.0 in mongod.conf
+      lineinfile:
+        path: /etc/mongod.conf
+        line: "  bindIp: 0.0.0.0"
+        search_string: "bindIp"
+        backup: yes
+    
+    - name: Verify MongoDB Enterprise Edition installed successfully.
+      shell: "more /var/log/mongodb/mongod.log | grep 'Waiting for connections'"
+      register: verify_mongodb
+      failed_when: "'Waiting for connections' not in verify_mongodb.stdout"
+
+    - name: Congratulations!
+      debug:
+        msg: "MongoDB installation complete."
