@@ -1,4 +1,4 @@
-# Ansible playbooks to install and uninstall MongoDB in private lab environments.
+# Ansible playbooks to install and uninstall MongoDB in the IBM Washington Systems Center's private lab environment.
 
 ## 1) Clone this repository:
 ~~~
