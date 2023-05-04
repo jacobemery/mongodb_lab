@@ -21,7 +21,7 @@
         - { pkg: libselinux-utils, when: "db_path != '/var/lib/mongodb' or log_file != '/var/log/mongodb/mongod.log'" }
         - { pkg: policycoreutils-python-utils, when: "db_path != '/var/lib/mongodb' or log_file != '/var/log/mongodb/mongod.log'" }
 
-    - name: Set SELinux to Permissive mode
+    - name: Set SELinux to Permissive mode.
       tags: selinux
       ansible.builtin.command: setenforce 0
       args:
@@ -29,7 +29,7 @@
       ignore_errors: yes
       when: "db_path != '/var/lib/mongodb' or log_file != '/var/log/mongodb/mongod.log'"
 
-    - name: Disable SELinux permanently in configuration
+    - name: Disable SELinux permanently in configuration.
       tags: selinux
       ansible.builtin.lineinfile:
         path: /etc/selinux/config
