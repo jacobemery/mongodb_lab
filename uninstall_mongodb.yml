@@ -26,8 +26,8 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - /var/log/mongodb 
-        - /var/lib/mongo 
+        - "{{ log_file }}" 
+        - "{{ db_path }}" 
 
     - name: Done.
       debug:

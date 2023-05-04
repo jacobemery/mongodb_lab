@@ -5,39 +5,91 @@
   become: true
   tasks:
     - name: Create repo file for mongodb-enterprise-6.0
+      tags: repo
       template:
         src: mongodb-enterprise.repo.j2
         dest: /etc/yum.repos.d/mongodb-enterprise-6.0.repo
 
     - name: Install mongodb-enterprise.
+      tags: pkg
       package:
-        name: mongodb-enterprise
+        name: "{{ item.pkg }}"
         state: present
+      when: item.when
+      loop:
+        - { pkg: mongodb-enterprise, when: true }
+        - { pkg: libselinux-utils, when: "{{ db_path }} != '/var/lib/mongodb' or {{ log_file }} != '/var/log/mongodb/mongod.log'" }
+        - { pkg: policycoreutils-python-utils, when: "{{ db_path }} != '/var/lib/mongodb' or {{ log_file }} != '/var/log/mongodb/mongod.log'" }
+
+    - name: Set SELinux to Permissive mode
+      tags: selinux
+      ansible.builtin.command: setenforce 0
+      args:
+        warn: no
+      ignore_errors: yes
+      when: "{{ db_path }} != '/var/lib/mongodb' or {{ log_file }} != '/var/log/mongodb/mongod.log'"
+
+    - name: Disable SELinux permanently in configuration
+      tags: selinux
+      ansible.builtin.lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+      when: "{{ db_path }} != '/var/lib/mongodb' or {{ log_file }} != '/var/log/mongodb/mongod.log'"
+
+    - name: Ensure db and log files exist and are owned by mongod user.
+      tags: db, log, files
+      file:
+        state: "{{ item.state }}"
+        path: "{{ item.path }}"
+        owner: mongod
+        group: mongod
+        recurse: "{{ item.recurse }}"
+      loop:
+        - { path: "{{ db_path }}", state: directory, recurse: true }
+        - { path: "{{ log_file }}", state: touch, recurse: false } 
+
+    - name: Change db and/or log file paths.
+      tags: db, log, files
+      lineinfile:
+        line: "  {{ item.key }}: {{ item.value }}"
+        path: /etc/mongod.conf
+        search_string: "{{ item.key }}"
+      when: item.when
+      loop:
+        - { key: dbPath, value: "{{ db_path }}", when: "{{ db_path }} != '/var/lib/mongodb'" }
+        - { key: path, value: "{{ log_file }}", when: "{{ log_file }} != '/var/log/mongodb/mongod.log'" }
 
     - name: Start mongod service.
+      tags: start, service
       service:
         name: mongod
-        state: started
+        state: restarted
         enabled: yes
 
     - name: Check mongod status.
+      tags: check, service
       shell: "systemctl status mongod"
       register: mongod_check
       failed_when: not 'active (running)' in mongod_check.stdout
-    
+
     - name: Print mongod status.
+      tags: check, service
       debug:
         msg: "{{ mongod_check.stdout }}"
 
     - name: Check mongod version.
+      tags: check, version
       shell: mongod --version
       register: mongod_version
 
     - name: Print mongod version.
+      tags: check, version
       debug:
         msg: mongod_version.stdout
 
     - name: Set bindIP to 0.0.0.0 in mongod.conf
+      tags: bindip
       lineinfile:
         path: /etc/mongod.conf
         line: "  bindIp: 0.0.0.0"
@@ -45,10 +97,12 @@
         backup: yes
     
     - name: Verify MongoDB Enterprise Edition installed successfully.
-      shell: "more /var/log/mongodb/mongod.log | grep 'Waiting for connections'"
+      tags: verify
+      shell: "more {{ log_file }} | grep 'Waiting for connections'"
       register: verify_mongodb
       failed_when: "'Waiting for connections' not in verify_mongodb.stdout"
 
     - name: Congratulations!
+      tags: debug, final
       debug:
         msg: "MongoDB installation complete."
